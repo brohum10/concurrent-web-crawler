@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: concurrent-web-crawler
+
+crawler:
+  workers: 8
+  max-pages: 500
+  per-host-delay: 250ms
+  request-timeout: 8s
+  max-retries: 2
+  user-agent: SohamCrawler/1.0 (+https://github.com/brohum10/concurrent-web-crawler)

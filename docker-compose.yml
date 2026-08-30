@@ -1,0 +1,30 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: crawler
+      POSTGRES_USER: crawler
+      POSTGRES_PASSWORD: crawler
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crawler"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - crawler-data:/var/lib/postgresql/data
+
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: postgres
+      CRAWLER_DB_URL: jdbc:postgresql://postgres:5432/crawler
+      CRAWLER_DB_USER: crawler
+      CRAWLER_DB_PASSWORD: crawler
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  crawler-data:

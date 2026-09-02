@@ -27,7 +27,8 @@ public class Bm25Index {
     private long totalDocumentLength;
 
     public void add(IndexedDocument document) {
-        Map<String, Integer> frequencies = termFrequencies(document.title() + " " + document.content());
+        Map<String, Integer> frequencies = termFrequencies(document.content());
+        termFrequencies(document.title()).forEach((term, count) -> frequencies.merge(term, count * 3, Integer::sum));
         lock.writeLock().lock();
         try {
             removeIfPresent(document.id());
@@ -71,8 +72,18 @@ public class Bm25Index {
             PriorityQueue<SearchHit> top = new PriorityQueue<>(Comparator.comparingDouble(SearchHit::score));
             scores.forEach((id, score) -> {
                 IndexedDocument document = documents.get(id);
+                List<String> matchedTerms = queryTerms.stream()
+                        .filter(term -> postings.getOrDefault(term, Map.of()).containsKey(id))
+                        .sorted()
+                        .toList();
                 SearchHit hit = new SearchHit(
-                        id, document.url(), document.title(), snippet(document.content()), score);
+                        id,
+                        document.url(),
+                        document.title(),
+                        snippet(document.content(), matchedTerms),
+                        score,
+                        matchedTerms,
+                        document.crawledAt());
                 top.offer(hit);
                 if (top.size() > limit) {
                     top.poll();
@@ -90,6 +101,16 @@ public class Bm25Index {
         lock.readLock().lock();
         try {
             return documents.size();
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    public IndexStats stats() {
+        lock.readLock().lock();
+        try {
+            long postingCount = postings.values().stream().mapToLong(Map::size).sum();
+            return new IndexStats(documents.size(), postings.size(), postingCount, totalDocumentLength);
         } finally {
             lock.readLock().unlock();
         }
@@ -120,8 +141,23 @@ public class Bm25Index {
         return tokens;
     }
 
-    private static String snippet(String content) {
+    private static String snippet(String content, List<String> queryTerms) {
         String normalized = content.replaceAll("\\s+", " ").trim();
-        return normalized.length() <= 180 ? normalized : normalized.substring(0, 177) + "...";
+        if (normalized.length() <= 220) {
+            return normalized;
+        }
+        String lower = normalized.toLowerCase(Locale.ROOT);
+        int match = queryTerms.stream()
+                .mapToInt(lower::indexOf)
+                .filter(index -> index >= 0)
+                .min()
+                .orElse(0);
+        int start = Math.max(0, match - 70);
+        int end = Math.min(normalized.length(), start + 220);
+        if (end - start < 220) {
+            start = Math.max(0, end - 220);
+        }
+        String excerpt = normalized.substring(start, end);
+        return (start > 0 ? "..." : "") + excerpt + (end < normalized.length() ? "..." : "");
     }
 }

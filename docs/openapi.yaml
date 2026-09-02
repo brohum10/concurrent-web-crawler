@@ -1,0 +1,184 @@
+openapi: 3.1.0
+info:
+  title: Concurrent Web Crawler API
+  version: 2.0.0
+  description: Bounded asynchronous crawling and BM25 search.
+servers:
+  - url: http://localhost:8080
+paths:
+  /api/v2/crawls:
+    post:
+      summary: Queue a crawl job
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrawlRequest'
+      responses:
+        '202':
+          description: Crawl accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CrawlJob'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          description: The bounded crawl queue is full
+    get:
+      summary: List crawl jobs newest first
+      responses:
+        '200':
+          description: Crawl job snapshots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CrawlJob'
+  /api/v2/crawls/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string}
+    get:
+      summary: Get crawl progress and its final report
+      responses:
+        '200':
+          description: Current crawl snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CrawlJob'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      summary: Request cooperative cancellation
+      responses:
+        '200':
+          description: Updated crawl snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CrawlJob'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/search:
+    get:
+      summary: Search indexed pages with BM25
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: {type: string}
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 50, default: 10}
+      responses:
+        '200':
+          description: Ranked search hits
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SearchHit'
+  /api/stats:
+    get:
+      summary: Return search index and crawl job statistics
+      responses:
+        '200': {description: Runtime statistics}
+  /actuator/prometheus:
+    get:
+      summary: Return Prometheus-formatted application metrics
+      responses:
+        '200':
+          description: Metrics exposition
+          content:
+            text/plain:
+              schema: {type: string}
+components:
+  responses:
+    BadRequest:
+      description: Invalid crawl options
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    NotFound:
+      description: Crawl job does not exist
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+  schemas:
+    CrawlRequest:
+      type: object
+      required: [seed]
+      properties:
+        seed: {type: string, format: uri, example: 'https://example.com'}
+        maxPages: {type: integer, minimum: 1, maximum: 500, default: 500}
+        maxDepth: {type: integer, minimum: 0, maximum: 50, default: 4}
+        scope:
+          type: string
+          enum: [SAME_ORIGIN, SAME_HOST, ANY]
+          default: SAME_HOST
+    CrawlJob:
+      type: object
+      required: [id, status, seed, options, progress, createdAt]
+      properties:
+        id: {type: string, example: crawl_55e8f21c2d9a}
+        status:
+          type: string
+          enum: [QUEUED, RUNNING, SUCCEEDED, FAILED, CANCELLED]
+        seed: {type: string, format: uri}
+        options: {$ref: '#/components/schemas/CrawlOptions'}
+        progress: {$ref: '#/components/schemas/CrawlProgress'}
+        report: {$ref: '#/components/schemas/CrawlReport'}
+        error: {type: [string, 'null']}
+        createdAt: {type: string, format: date-time}
+        startedAt: {type: [string, 'null'], format: date-time}
+        finishedAt: {type: [string, 'null'], format: date-time}
+    CrawlOptions:
+      type: object
+      required: [maxPages, maxDepth, scope]
+      properties:
+        maxPages: {type: integer}
+        maxDepth: {type: integer}
+        scope: {type: string, enum: [SAME_ORIGIN, SAME_HOST, ANY]}
+    CrawlProgress:
+      type: object
+      required: [scheduled, indexed, failed, skipped, bytesProcessed, maxDepthReached]
+      properties:
+        scheduled: {type: integer}
+        indexed: {type: integer}
+        failed: {type: integer}
+        skipped: {type: integer}
+        bytesProcessed: {type: integer, format: int64}
+        maxDepthReached: {type: integer}
+    CrawlReport:
+      allOf:
+        - {$ref: '#/components/schemas/CrawlProgress'}
+        - type: object
+          required: [cancelled, elapsed]
+          properties:
+            cancelled: {type: boolean}
+            elapsed: {type: string, example: PT1.42S}
+    SearchHit:
+      type: object
+      required: [id, url, title, snippet, score, matchedTerms, crawledAt]
+      properties:
+        id: {type: string}
+        url: {type: string, format: uri}
+        title: {type: string}
+        snippet: {type: string}
+        score: {type: number, format: double}
+        matchedTerms:
+          type: array
+          items: {type: string}
+        crawledAt: {type: string, format: date-time}
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: {type: string}

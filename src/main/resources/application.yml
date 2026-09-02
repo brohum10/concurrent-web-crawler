@@ -8,4 +8,13 @@ crawler:
   per-host-delay: 250ms
   request-timeout: 8s
   max-retries: 2
-  user-agent: SohamCrawler/1.0 (+https://github.com/brohum10/concurrent-web-crawler)
+  max-response-bytes: 2000000
+  max-concurrent-jobs: 2
+  max-queued-jobs: 50
+  user-agent: SohamCrawler/2.0 (+https://github.com/brohum10/concurrent-web-crawler)
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus

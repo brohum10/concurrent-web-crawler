@@ -31,6 +31,35 @@ class Bm25IndexTest {
         assertEquals("New title", index.search("java", 10).get(0).title());
     }
 
+    @Test
+    void boostsTitleMatchesAndReturnsExplainableMetadata() {
+        Bm25Index index = new Bm25Index();
+        index.add(document("title", "Distributed tracing", "observability guide"));
+        index.add(document("body", "Operations", "distributed systems and tracing fundamentals"));
+
+        SearchHit first = index.search("distributed tracing", 2).get(0);
+
+        assertEquals("title", first.id());
+        assertEquals(List.of("distributed", "tracing"), first.matchedTerms());
+        assertEquals(Instant.EPOCH, first.crawledAt());
+    }
+
+    @Test
+    void buildsQueryAwareSnippetsAndReportsIndexStats() {
+        Bm25Index index = new Bm25Index();
+        String prefix = "background ".repeat(35);
+        index.add(document("1", "Architecture", prefix + "backpressure protects the worker queue from overload"));
+
+        SearchHit hit = index.search("backpressure", 1).get(0);
+        IndexStats stats = index.stats();
+
+        assertTrue(hit.snippet().contains("backpressure"));
+        assertTrue(hit.snippet().startsWith("..."));
+        assertEquals(1, stats.documents());
+        assertTrue(stats.uniqueTerms() > 3);
+        assertTrue(stats.totalTokens() > 0);
+    }
+
     private static IndexedDocument document(String id, String title, String content) {
         return new IndexedDocument(id, "https://example.com/" + id, title, content, Instant.EPOCH);
     }

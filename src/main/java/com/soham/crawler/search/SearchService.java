@@ -46,6 +46,10 @@ public class SearchService {
         return index.size();
     }
 
+    public IndexStats stats() {
+        return index.stats();
+    }
+
     private static String sha256(String value) {
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));

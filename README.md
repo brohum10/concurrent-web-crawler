@@ -112,7 +112,7 @@ Spring properties can be overridden in `application.yml`, through environment va
 ./gradlew clean test bootJar
 ```
 
-The deterministic suite covers cycles and concurrent duplicate suppression, depth/scope/cancellation behavior, URL normalization, redirect and body-size handling, robots rules, BM25 ranking, metadata/snippets, index statistics, persistence boundaries, and application startup.
+The 20-test deterministic suite covers cycles and concurrent duplicate suppression, depth/scope/cancellation behavior, URL normalization, redirect and body-size handling, robots rules, BM25 ranking, metadata/snippets, index statistics, persistence boundaries, benchmark labeling, and application startup.
 
 Run the deterministic search benchmark:
 
@@ -120,13 +120,13 @@ Run the deterministic search benchmark:
 ./gradlew benchmark --args='25000 1000'
 ```
 
-Latest local run on an arm64 Mac (September 1, 2026):
+Latest local run on an arm64 Mac (September 29, 2026; 25,000 synthetic documents):
 
-| Documents | Queries | Recall@10 | p50 | p95 |
-|---:|---:|---:|---:|---:|
-| 25,000 | 1,000 | 1.000 | 18.294 ms | 20.503 ms |
+| Documents | Queries | Hit@10 | Precision@10 | MRR@10 | p50 | p95 |
+|---:|---:|---:|---:|---:|---:|---:|
+| 25,000 | 1,000 | 1.000 | 1.000 | 1.000 | 15.709 ms | 17.239 ms |
 
-These numbers measure the in-memory search benchmark, not network crawling. Crawl throughput is intentionally constrained by politeness settings and real network latency.
+The benchmark checks exact synthetic topic-token queries. Its previous “Recall@10” label was wrong: finding at least one relevant document is query **hit rate@10**, not standard document recall when each topic has many relevant documents. The benchmark now reports hit rate, precision, and MRR with exact topic matching, so `Topic 1` cannot accidentally match `Topic 10`. These numbers measure in-memory search, not network crawling or real-world relevance. Crawl throughput is intentionally constrained by politeness settings and real network latency.
 
 ## Responsible use
 

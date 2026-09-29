@@ -1,7 +1,6 @@
 package com.soham.crawler.search;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -23,21 +22,34 @@ public final class Bm25Benchmark {
         }
 
         long[] latencies = new long[queries];
-        int correct = 0;
+        int queryHits = 0;
+        double reciprocalRankSum = 0.0;
+        double precisionSum = 0.0;
         for (int query = 0; query < queries; query++) {
             int topic = query % 250;
             long started = System.nanoTime();
             List<SearchHit> hits = index.search("topic" + topic + " reliability", 10);
             latencies[query] = System.nanoTime() - started;
-            if (hits.stream().anyMatch(hit -> hit.title().contains("Topic " + topic))) {
-                correct++;
+            int relevant = 0;
+            for (int position = 0; position < hits.size(); position++) {
+                // Exact equality matters: "Topic 1" must not match "Topic 10".
+                if (hits.get(position).title().equals("Topic " + topic + " reference")) {
+                    relevant++;
+                    if (relevant == 1) {
+                        reciprocalRankSum += 1.0 / (position + 1);
+                    }
+                }
             }
+            precisionSum += hits.isEmpty() ? 0.0 : (double) relevant / hits.size();
+            if (relevant > 0) queryHits++;
         }
         Arrays.sort(latencies);
-        System.out.printf("documents=%d queries=%d recall_at_10=%.3f p50_ms=%.3f p95_ms=%.3f%n",
+        System.out.printf("documents=%d queries=%d hit_rate_at_10=%.3f precision_at_10=%.3f mrr_at_10=%.3f p50_ms=%.3f p95_ms=%.3f%n",
                 documents,
                 queries,
-                (double) correct / queries,
+                (double) queryHits / queries,
+                precisionSum / queries,
+                reciprocalRankSum / queries,
                 percentileMillis(latencies, 0.50),
                 percentileMillis(latencies, 0.95));
     }

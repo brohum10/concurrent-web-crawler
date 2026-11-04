@@ -38,3 +38,10 @@ tasks.register('benchmark', JavaExec) {
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'com.soham.crawler.search.Bm25Benchmark'
 }
+
+tasks.register('cranfieldEval', JavaExec) {
+    group = 'verification'
+    description = 'Evaluates BM25 against Cranfield human relevance judgments.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.soham.crawler.search.CranfieldEvaluation'
+}

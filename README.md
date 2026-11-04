@@ -112,7 +112,31 @@ Spring properties can be overridden in `application.yml`, through environment va
 ./gradlew clean test bootJar
 ```
 
-The 20-test deterministic suite covers cycles and concurrent duplicate suppression, depth/scope/cancellation behavior, URL normalization, redirect and body-size handling, robots rules, BM25 ranking, metadata/snippets, index statistics, persistence boundaries, benchmark labeling, and application startup.
+The 21-test deterministic suite covers cycles and concurrent duplicate suppression, depth/scope/cancellation behavior, URL normalization, redirect and body-size handling, robots rules, BM25 ranking, metadata/snippets, index statistics, persistence boundaries, benchmark labeling, Cranfield parsing, and application startup.
+
+### Human-judged retrieval check
+
+The synthetic speed benchmark below makes relevance too easy. For a separate quality check, `cranfieldEval` runs the index against the [Cranfield 1400 collection](https://ir.dcs.gla.ac.uk/resources/test_collections/cran/): 1,400 aerospace abstracts, 225 natural-language queries, and human relevance judgments. The collection is downloaded from the University of Glasgow; its documents are not copied into this repository.
+
+```bash
+mkdir -p build/cranfield
+curl -L --fail https://ir.dcs.gla.ac.uk/resources/test_collections/cran/cran.tar.gz -o build/cran.tar.gz
+shasum -a 256 build/cran.tar.gz
+# Expected SHA-256: 8c48a8412e4a7e6e0dd5af99c959f8d75fdf88135602adc1a56aa22770652d64
+tar -xzf build/cran.tar.gz -C build/cranfield
+./gradlew cranfieldEval --args='build/cranfield'
+```
+
+The evaluator compares a **title-only** baseline with the current **title + abstract** index. It maps qrels by query order because `cran.qry` identifiers have gaps, and converts the source's inverted grades (`-1` strongest, then `1` through `4`) into descending gains. All listed judgments count as relevant for Hit@10, MRR@10, and Recall@10; nDCG@10 uses the grades. Unlisted documents are treated as nonrelevant. A local arm64/JDK 23 run produced:
+
+| Variant | Hit@10 | MRR@10 | Recall@10 | nDCG@10 |
+|:--|--:|--:|--:|--:|
+| Title only | 0.8756 | 0.6706 | 0.3285 | 0.3879 |
+| Title + abstract | 0.9289 | 0.7812 | 0.4374 | 0.5107 |
+
+These are **search-index** results on historic aerospace text, not crawl throughput or web-search quality. This collection is small and domain-specific; it is useful because labels come from people outside this project. The index has no stemming or semantic expansion, and the 225 queries were not used to tune it. The parser and qrel mapping have a focused regression test.
+
+### Synthetic speed check
 
 Run the deterministic search benchmark:
 
